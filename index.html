@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CutStudio — Web Video Editor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -3026,7 +3025,8 @@ function CutStudio() {
     fps: 30,
     format: "mp4",
     quality: "high",
-    bitrate: "auto"
+    bitrate: "auto",
+    filename: ""
   });
   const [saveSettings, setSaveSettings] = useState({
     autoSave: false,
@@ -3194,6 +3194,67 @@ function CutStudio() {
     setIsSaved(true);
     if (!auto) setShowSave(false);
   }, [projectName, clips, textLayers, pictureLayers, emojiLayers, musicLayers, expSettings, saveSettings]);
+
+  /* ── actual file download / file picker ── */
+  const downloadJSON = useCallback(async (usePicker = false) => {
+    const proj = {
+      version: "1.0",
+      projectName,
+      exportSettings: expSettings,
+      textLayers,
+      pictureLayers: pictureLayers.map(l => ({
+        ...l,
+        imageUrl: undefined
+      })),
+      emojiLayers: emojiLayers.map(l => ({
+        ...l,
+        imageUrl: undefined
+      })),
+      musicLayers: musicLayers.map(l => ({
+        ...l,
+        audioUrl: undefined
+      })),
+      clips: clips.map(c => ({
+        ...c,
+        url: undefined
+      }))
+    };
+    const json = JSON.stringify(proj, null, 2);
+    const fname = (saveSettings.filename || projectName || "project").replace(/[^\w\s\-]/g, "_") + ".csproj";
+    if (usePicker && "showSaveFilePicker" in window) {
+      try {
+        const h = await window.showSaveFilePicker({
+          suggestedName: fname,
+          types: [{
+            description: "CutStudio Project",
+            accept: {
+              "application/json": [".csproj", ".json"]
+            }
+          }]
+        });
+        const w = await h.createWritable();
+        await w.write(json);
+        await w.close();
+        setIsSaved(true);
+      } catch (e) {
+        if (e.name !== "AbortError") console.error(e);
+      }
+    } else {
+      const blob = new Blob([json], {
+        type: "application/json"
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setIsSaved(true);
+    }
+  }, [projectName, saveSettings, expSettings, textLayers, pictureLayers, emojiLayers, musicLayers, clips]);
+  const hasFSA = typeof window !== "undefined" && "showSaveFilePicker" in window;
   const addText = useCallback(preset => {
     const l = {
       id: uid(),
@@ -3717,18 +3778,9 @@ function CutStudio() {
     }
   }, clips.length, " clips \xB7 ", allLayerCount, " layers"), React.createElement("button", {
     className: "cs-btn",
-    onClick: () => setShowSave(true),
-    style: mkBtn({
-      background: C.surf2,
-      color: C.txt,
-      border: `1.5px solid ${C.border}`,
-      fontSize: 14
-    })
-  }, "\uD83D\uDCBE Save"), React.createElement("button", {
-    className: "cs-btn",
     onClick: () => {
       setExportDone(false);
-      setShowExport(true);
+      setShowSave(true);
     },
     style: mkBtn({
       background: C.acc,
@@ -3736,7 +3788,7 @@ function CutStudio() {
       fontWeight: 700,
       fontSize: 14
     })
-  }, "\uD83D\uDE80 Export")), React.createElement("div", {
+  }, "\uD83D\uDCBE Save / Export")), React.createElement("div", {
     style: {
       flex: 1,
       display: "flex",
@@ -5121,7 +5173,7 @@ function CutStudio() {
         clipPath: "polygon(50% 100%,0 0,100% 0)"
       }
     })))));
-  })(), showExport && React.createElement("div", {
+  })(), showSave && React.createElement("div", {
     style: {
       position: "fixed",
       inset: 0,
@@ -5132,14 +5184,14 @@ function CutStudio() {
       zIndex: 200,
       backdropFilter: "blur(4px)"
     },
-    onClick: () => !isExporting && !exportDone && setShowExport(false)
+    onClick: () => !isExporting && setShowSave(false)
   }, React.createElement("div", {
     style: {
       background: C.surf,
       borderRadius: 18,
-      padding: 30,
-      width: 500,
-      maxHeight: "88vh",
+      padding: 28,
+      width: 520,
+      maxHeight: "92vh",
       overflowY: "auto",
       boxShadow: "0 20px 60px rgba(0,0,0,.2)"
     },
@@ -5149,53 +5201,132 @@ function CutStudio() {
       fontFamily: "'Syne',sans-serif",
       fontWeight: 800,
       fontSize: 22,
-      marginBottom: 22
+      marginBottom: 4
     }
-  }, "\uD83D\uDE80 Export Video"), React.createElement("div", {
-    style: SEC
-  }, "Resolution"), React.createElement("div", {
+  }, "\uD83D\uDCBE Save / Export"), React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: C.muted,
+      marginBottom: 20
+    }
+  }, "\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E23\u0E39\u0E1B\u0E41\u0E1A\u0E1A\u0E44\u0E1F\u0E25\u0E4C\u0E41\u0E25\u0E30\u0E17\u0E35\u0E48\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01"), !isExporting && !exportDone && React.createElement(React.Fragment, null, React.createElement("label", {
+    style: LBL
+  }, "\u0E0A\u0E37\u0E48\u0E2D\u0E44\u0E1F\u0E25\u0E4C"), React.createElement("div", {
     style: {
       display: "flex",
-      flexDirection: "column",
-      gap: 7,
-      marginBottom: 18
+      gap: 8,
+      alignItems: "center",
+      marginBottom: 16
     }
-  }, RESOLUTIONS.map(r => React.createElement("div", {
-    key: r.id,
-    className: `cs-res${expSettings.resolution === r.id ? " on" : ""}`,
-    onClick: () => setExpSettings(s => ({
+  }, React.createElement("input", {
+    value: saveSettings.filename || "",
+    onChange: e => setSaveSettings(s => ({
       ...s,
-      resolution: r.id
+      filename: e.target.value
+    })),
+    placeholder: projectName || "my-video",
+    style: {
+      ...INP,
+      flex: 1
+    }
+  }), React.createElement("select", {
+    value: expSettings.format,
+    onChange: e => setExpSettings(s => ({
+      ...s,
+      format: e.target.value
     })),
     style: {
-      padding: "10px 14px",
-      borderRadius: 10,
-      border: `1.5px solid ${expSettings.resolution === r.id ? C.acc : C.border}`,
-      background: expSettings.resolution === r.id ? "#eff6ff" : C.surf2,
-      cursor: "pointer",
+      ...INP,
+      width: "auto",
+      padding: "8px 12px",
+      fontWeight: 600,
+      background: C.acc,
+      color: "#fff",
+      border: "none",
+      flexShrink: 0
+    }
+  }, React.createElement("option", {
+    value: "mp4"
+  }, "\uD83C\uDFAC MP4 (\u0E41\u0E19\u0E30\u0E19\u0E33)"), React.createElement("option", {
+    value: "webm"
+  }, "\uD83C\uDF10 WebM"), React.createElement("option", {
+    value: "mov"
+  }, "\uD83C\uDF9E MOV"), React.createElement("option", {
+    value: "gif"
+  }, "\uD83D\uDDBC GIF"), React.createElement("option", {
+    value: "csproj"
+  }, "\uD83D\uDCC4 Project (.csproj)"))), React.createElement("div", {
+    style: {
       display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center"
+      gap: 8,
+      marginBottom: 16,
+      flexWrap: "wrap"
     }
-  }, React.createElement("span", {
+  }, [{
+    f: "mp4",
+    label: "✅ เปิดได้ทุกอุปกรณ์ · upload ได้เลย",
+    color: "#2563eb"
+  }, {
+    f: "webm",
+    label: "🌐 เหมาะกับเว็บ / YouTube",
+    color: "#059669"
+  }, {
+    f: "mov",
+    label: "🎞 คุณภาพสูง · Mac / Final Cut",
+    color: "#9333ea"
+  }, {
+    f: "gif",
+    label: "🖼 ภาพเคลื่อนไหว · Social media",
+    color: "#d97706"
+  }, {
+    f: "csproj",
+    label: "📋 บันทึกโปรเจกต์ · เปิดแก้ต่อได้",
+    color: "#6366f1"
+  }].filter(x => x.f === expSettings.format).map(x => React.createElement("span", {
+    key: x.f,
     style: {
-      fontSize: 13
+      background: x.color + "18",
+      color: x.color,
+      border: `1px solid ${x.color}40`,
+      borderRadius: 20,
+      padding: "3px 12px",
+      fontSize: 12,
+      fontWeight: 600
     }
-  }, r.label), expSettings.resolution === r.id && React.createElement("span", {
+  }, x.label))), expSettings.format !== "csproj" && React.createElement("div", {
     style: {
-      color: C.acc,
-      fontWeight: 700
+      background: C.surf2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 12,
+      padding: "14px 16px",
+      marginBottom: 16
     }
-  }, "\u2713")))), React.createElement("div", {
+  }, React.createElement("div", {
+    style: {
+      ...SEC,
+      marginBottom: 10
+    }
+  }, "\uD83D\uDCD0 \u0E15\u0E31\u0E49\u0E07\u0E04\u0E48\u0E32\u0E40\u0E2D\u0E32\u0E15\u0E4C\u0E1E\u0E38\u0E15"), React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
-      gap: 12,
-      marginBottom: 18
+      gap: 10
     }
   }, React.createElement("div", null, React.createElement("label", {
     style: LBL
-  }, "FPS"), React.createElement("select", {
+  }, "\u0E04\u0E27\u0E32\u0E21\u0E25\u0E30\u0E40\u0E2D\u0E35\u0E22\u0E14"), React.createElement("select", {
+    value: expSettings.resolution,
+    onChange: e => setExpSettings(s => ({
+      ...s,
+      resolution: e.target.value
+    })),
+    style: INP
+  }, RESOLUTIONS.map(r => React.createElement("option", {
+    key: r.id,
+    value: r.id
+  }, r.label)))), React.createElement("div", null, React.createElement("label", {
+    style: LBL
+  }, "\u0E40\u0E1F\u0E23\u0E21\u0E40\u0E23\u0E15"), React.createElement("select", {
     value: expSettings.fps,
     onChange: e => setExpSettings(s => ({
       ...s,
@@ -5204,30 +5335,13 @@ function CutStudio() {
     style: INP
   }, React.createElement("option", {
     value: 24
-  }, "24 FPS"), React.createElement("option", {
+  }, "24 FPS (\u0E20\u0E32\u0E1E\u0E22\u0E19\u0E15\u0E23\u0E4C)"), React.createElement("option", {
     value: 30
-  }, "30 FPS"), React.createElement("option", {
+  }, "30 FPS (\u0E21\u0E32\u0E15\u0E23\u0E10\u0E32\u0E19)"), React.createElement("option", {
     value: 60
-  }, "60 FPS"))), React.createElement("div", null, React.createElement("label", {
+  }, "60 FPS (\u0E25\u0E37\u0E48\u0E19\u0E44\u0E2B\u0E25)"))), React.createElement("div", null, React.createElement("label", {
     style: LBL
-  }, "Format"), React.createElement("select", {
-    value: expSettings.format,
-    onChange: e => setExpSettings(s => ({
-      ...s,
-      format: e.target.value
-    })),
-    style: INP
-  }, React.createElement("option", {
-    value: "mp4"
-  }, "MP4"), React.createElement("option", {
-    value: "webm"
-  }, "WebM"), React.createElement("option", {
-    value: "mov"
-  }, "MOV"), React.createElement("option", {
-    value: "gif"
-  }, "GIF"))), React.createElement("div", null, React.createElement("label", {
-    style: LBL
-  }, "Quality"), React.createElement("select", {
+  }, "\u0E04\u0E38\u0E13\u0E20\u0E32\u0E1E"), React.createElement("select", {
     value: expSettings.quality,
     onChange: e => setExpSettings(s => ({
       ...s,
@@ -5236,13 +5350,13 @@ function CutStudio() {
     style: INP
   }, React.createElement("option", {
     value: "low"
-  }, "Low"), React.createElement("option", {
+  }, "\u0E15\u0E48\u0E33 (\u0E40\u0E23\u0E47\u0E27)"), React.createElement("option", {
     value: "medium"
-  }, "Medium"), React.createElement("option", {
+  }, "\u0E01\u0E25\u0E32\u0E07"), React.createElement("option", {
     value: "high"
-  }, "High"), React.createElement("option", {
+  }, "\u0E2A\u0E39\u0E07 \u2713"), React.createElement("option", {
     value: "ultra"
-  }, "Ultra"))), React.createElement("div", null, React.createElement("label", {
+  }, "\u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14 (\u0E0A\u0E49\u0E32)"))), React.createElement("div", null, React.createElement("label", {
     style: LBL
   }, "Bitrate"), React.createElement("select", {
     value: expSettings.bitrate,
@@ -5253,42 +5367,121 @@ function CutStudio() {
     style: INP
   }, React.createElement("option", {
     value: "auto"
-  }, "Auto"), React.createElement("option", {
+  }, "\u0E2D\u0E31\u0E15\u0E42\u0E19\u0E21\u0E31\u0E15\u0E34"), React.createElement("option", {
     value: "4m"
   }, "4 Mbps"), React.createElement("option", {
     value: "8m"
   }, "8 Mbps"), React.createElement("option", {
     value: "16m"
-  }, "16 Mbps")))), isExporting ? React.createElement("div", null, React.createElement("div", {
+  }, "16 Mbps"))))), expSettings.format === "csproj" && React.createElement("div", {
     style: {
+      background: "#eff6ff",
+      border: "1px solid #bfdbfe",
+      borderRadius: 10,
+      padding: "12px 14px",
+      marginBottom: 16,
+      fontSize: 13,
+      color: "#1e40af",
+      lineHeight: 1.6
+    }
+  }, "\uD83D\uDCCB \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01 text, timing, effect \u0E17\u0E31\u0E49\u0E07\u0E2B\u0E21\u0E14 \u2014 \u0E40\u0E1B\u0E34\u0E14\u0E44\u0E1F\u0E25\u0E4C\u0E19\u0E35\u0E49\u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E41\u0E01\u0E49\u0E15\u0E48\u0E2D\u0E44\u0E14\u0E49\u0E20\u0E32\u0E22\u0E2B\u0E25\u0E31\u0E07 (\u0E44\u0E21\u0E48\u0E23\u0E27\u0E21\u0E44\u0E1F\u0E25\u0E4C\u0E27\u0E34\u0E14\u0E35\u0E42\u0E2D/\u0E23\u0E39\u0E1B\u0E20\u0E32\u0E1E)"), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, React.createElement("button", {
+    className: "cs-btn",
+    onClick: () => doExport(),
+    style: mkBtn({
+      background: C.acc,
+      color: "#fff",
+      fontWeight: 700,
+      flex: 2,
       fontSize: 14,
+      gap: 8
+    })
+  }, React.createElement("span", null, "\u2B07"), " Download"), hasFSA && React.createElement("button", {
+    className: "cs-btn",
+    onClick: async () => {
+      await downloadJSON(true);
+    },
+    style: mkBtn({
+      background: "#7c3aed",
+      color: "#fff",
+      fontWeight: 700,
+      flex: 1,
+      fontSize: 14,
+      gap: 8
+    })
+  }, "\uD83D\uDCC1 \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E17\u0E35\u0E48\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01")), !hasFSA && React.createElement("div", {
+    style: {
+      fontSize: 11,
       color: C.muted,
+      textAlign: "center",
+      marginTop: 6
+    }
+  }, "\u0E43\u0E0A\u0E49 Chrome/Edge \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E40\u0E1B\u0E34\u0E14\u0E43\u0E0A\u0E49 \"\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E17\u0E35\u0E48\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\""), React.createElement("button", {
+    className: "cs-btn",
+    onClick: () => setShowSave(false),
+    style: mkBtn({
+      background: "transparent",
+      color: C.muted,
+      width: "100%",
+      marginTop: 8,
+      fontSize: 13
+    })
+  }, "\u0E22\u0E01\u0E40\u0E25\u0E34\u0E01")), isExporting && React.createElement("div", {
+    style: {
+      padding: "20px 0"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
       marginBottom: 10
     }
-  }, "Encoding\u2026 ", Math.round(exportPct), "%"), React.createElement("div", {
+  }, React.createElement("span", {
     style: {
-      height: 8,
-      borderRadius: 4,
+      fontSize: 14,
+      fontWeight: 600
+    }
+  }, "\u0E01\u0E33\u0E25\u0E31\u0E07 Export\u2026"), React.createElement("span", {
+    style: {
+      fontSize: 14,
+      color: C.acc,
+      fontWeight: 700
+    }
+  }, Math.round(exportPct), "%")), React.createElement("div", {
+    style: {
+      height: 10,
+      borderRadius: 5,
       background: C.surf2,
-      overflow: "hidden"
+      overflow: "hidden",
+      marginBottom: 8
     }
   }, React.createElement("div", {
     style: {
       height: "100%",
       width: `${exportPct}%`,
       background: `linear-gradient(90deg,${C.acc},${C.acc2})`,
-      borderRadius: 4,
+      borderRadius: 5,
       transition: "width .3s"
     }
-  }))) : exportDone ? React.createElement("div", {
+  })), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.muted,
+      textAlign: "center"
+    }
+  }, expSettings.resolution, " \xB7 ", expSettings.fps, " fps \xB7 ", expSettings.format.toUpperCase(), " \xB7 ", expSettings.quality)), exportDone && !isExporting && React.createElement("div", null, React.createElement("div", {
     style: {
       textAlign: "center",
-      padding: "20px 0"
+      padding: "12px 0 16px"
     }
   }, React.createElement("div", {
     style: {
       fontSize: 44,
-      marginBottom: 10
+      marginBottom: 8
     }
   }, "\uD83C\uDF89"), React.createElement("div", {
     style: {
@@ -5297,181 +5490,50 @@ function CutStudio() {
       marginBottom: 4,
       color: C.grn
     }
-  }, "Export Complete!"), React.createElement("button", {
+  }, "\u0E40\u0E2A\u0E23\u0E47\u0E08\u0E41\u0E25\u0E49\u0E27!"), React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: C.muted
+    }
+  }, saveSettings.filename || projectName || "my-video", ".", expSettings.format)), React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, React.createElement("button", {
+    className: "cs-btn",
+    onClick: () => downloadJSON(false),
+    style: mkBtn({
+      background: C.acc,
+      color: "#fff",
+      fontWeight: 700,
+      width: "100%",
+      fontSize: 14
+    })
+  }, "\u2B07 \u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E44\u0E1B\u0E22\u0E31\u0E07 Downloads"), hasFSA && React.createElement("button", {
+    className: "cs-btn",
+    onClick: () => downloadJSON(true),
+    style: mkBtn({
+      background: "#7c3aed",
+      color: "#fff",
+      fontWeight: 700,
+      width: "100%",
+      fontSize: 14
+    })
+  }, "\uD83D\uDCC1 \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E42\u0E1F\u0E25\u0E40\u0E14\u0E2D\u0E23\u0E4C\u0E17\u0E35\u0E48\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01"), React.createElement("button", {
     className: "cs-btn",
     onClick: () => {
       setExportDone(false);
-      setShowExport(false);
+      setShowSave(false);
     },
-    style: mkBtn({
-      background: C.acc,
-      color: "#fff",
-      fontWeight: 700,
-      padding: "11px 28px",
-      marginTop: 14
-    })
-  }, "Close")) : React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 10
-    }
-  }, React.createElement("button", {
-    className: "cs-btn",
-    onClick: () => setShowExport(false),
     style: mkBtn({
       background: C.surf2,
       color: C.txt,
       border: `1.5px solid ${C.border}`,
-      flex: 1
+      width: "100%"
     })
-  }, "Cancel"), React.createElement("button", {
-    className: "cs-btn",
-    onClick: doExport,
-    style: mkBtn({
-      background: C.acc,
-      color: "#fff",
-      fontWeight: 700,
-      flex: 2
-    })
-  }, "\uD83D\uDE80 Export")))), showSave && React.createElement("div", {
-    style: {
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,.45)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 200,
-      backdropFilter: "blur(4px)"
-    },
-    onClick: () => setShowSave(false)
-  }, React.createElement("div", {
-    style: {
-      background: C.surf,
-      borderRadius: 18,
-      padding: 30,
-      width: 440,
-      boxShadow: "0 20px 60px rgba(0,0,0,.2)"
-    },
-    onClick: e => e.stopPropagation()
-  }, React.createElement("div", {
-    style: {
-      fontFamily: "'Syne',sans-serif",
-      fontWeight: 800,
-      fontSize: 22,
-      marginBottom: 22
-    }
-  }, "\uD83D\uDCBE Save Settings"), React.createElement("label", {
-    style: LBL
-  }, "Project Name"), React.createElement("input", {
-    value: projectName,
-    onChange: e => setProjectName(e.target.value),
-    style: {
-      ...INP,
-      marginBottom: 14
-    }
-  }), React.createElement("label", {
-    style: LBL
-  }, "File Name"), React.createElement("input", {
-    value: saveSettings.filename,
-    onChange: e => setSaveSettings(s => ({
-      ...s,
-      filename: e.target.value
-    })),
-    style: {
-      ...INP,
-      marginBottom: 14
-    }
-  }), React.createElement("label", {
-    style: LBL
-  }, "Save Location"), React.createElement("select", {
-    value: saveSettings.location,
-    onChange: e => setSaveSettings(s => ({
-      ...s,
-      location: e.target.value
-    })),
-    style: {
-      ...INP,
-      marginBottom: 14
-    }
-  }, React.createElement("option", {
-    value: "browser"
-  }, "Browser (localStorage)"), React.createElement("option", {
-    value: "download"
-  }, "Download JSON")), React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 12,
-      padding: "12px 16px",
-      background: C.surf2,
-      borderRadius: 10,
-      marginBottom: 12,
-      border: `1px solid ${C.border}`
-    }
-  }, React.createElement("input", {
-    type: "checkbox",
-    id: "autosave",
-    checked: saveSettings.autoSave,
-    onChange: e => setSaveSettings(s => ({
-      ...s,
-      autoSave: e.target.checked
-    })),
-    style: {
-      accentColor: C.acc,
-      width: 17,
-      height: 17
-    }
-  }), React.createElement("label", {
-    htmlFor: "autosave",
-    style: {
-      fontSize: 14,
-      cursor: "pointer",
-      flex: 1,
-      fontWeight: 500
-    }
-  }, "Auto-save"), saveSettings.autoSave && React.createElement("select", {
-    value: saveSettings.interval,
-    onChange: e => setSaveSettings(s => ({
-      ...s,
-      interval: +e.target.value
-    })),
-    style: {
-      ...INP,
-      width: "auto"
-    }
-  }, React.createElement("option", {
-    value: 1
-  }, "1 min"), React.createElement("option", {
-    value: 5
-  }, "5 min"), React.createElement("option", {
-    value: 10
-  }, "10 min"), React.createElement("option", {
-    value: 30
-  }, "30 min"))), React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 10
-    }
-  }, React.createElement("button", {
-    className: "cs-btn",
-    onClick: () => setShowSave(false),
-    style: mkBtn({
-      background: C.surf2,
-      color: C.txt,
-      border: `1.5px solid ${C.border}`,
-      flex: 1
-    })
-  }, "Cancel"), React.createElement("button", {
-    className: "cs-btn",
-    onClick: () => doSave(false),
-    style: mkBtn({
-      background: C.acc,
-      color: "#fff",
-      fontWeight: 700,
-      flex: 2
-    })
-  }, "\uD83D\uDCBE Save")))));
+  }, "\u0E1B\u0E34\u0E14"))))));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(CutStudio, null));
   </script>
