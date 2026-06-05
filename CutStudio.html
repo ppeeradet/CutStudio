@@ -4865,12 +4865,18 @@ function CutStudio() {
       layers: musicLayers
     }];
     const visibleTracks = trackDefs.filter(t => t.always || t.layers?.length > 0);
-    const tlH = Math.min(44 + 20 + visibleTracks.length * 28, 220);
-    const totalW = Math.max(totalDur, 30) * pxPerSec + 96,
-      tickStep = zoom >= 2 ? 1 : zoom >= 1 ? 2 : 5;
+    const totalW = Math.max(totalDur, 30) * pxPerSec + 96;
+    const tickStep = zoom >= 2 ? 1 : zoom >= 1 ? 2 : 5;
+    /* dynamic track height fills available space inside 25vh */
+    const HEADER_H = 38,
+      RULER_H = 26;
+    const TRACK_H = Math.max(40, Math.floor((window.innerHeight * 0.25 - HEADER_H - RULER_H) / visibleTracks.length));
+    const CLIP_H = TRACK_H - 6;
+    const tlTotalH = HEADER_H + RULER_H + visibleTracks.length * TRACK_H + 8;
     return React.createElement("div", {
       style: {
-        height: tlH,
+        height: "25vh",
+        minHeight: 200,
         background: C.surf,
         borderTop: `1.5px solid ${C.border}`,
         flexShrink: 0,
@@ -4879,16 +4885,17 @@ function CutStudio() {
       }
     }, React.createElement("div", {
       style: {
+        height: HEADER_H,
         display: "flex",
         alignItems: "center",
         gap: 10,
-        padding: "5px 14px",
+        padding: "0 16px",
         borderBottom: `1px solid ${C.border}`,
         flexShrink: 0
       }
     }, React.createElement("span", {
       style: {
-        fontSize: 12,
+        fontSize: 13,
         color: C.muted,
         fontWeight: 700,
         textTransform: "uppercase",
@@ -4898,7 +4905,12 @@ function CutStudio() {
       style: {
         flex: 1
       }
-    }), React.createElement("input", {
+    }), React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: C.muted
+      }
+    }, "Zoom"), React.createElement("input", {
       type: "range",
       min: .25,
       max: 5,
@@ -4906,29 +4918,30 @@ function CutStudio() {
       value: zoom,
       onChange: e => setZoom(+e.target.value),
       style: {
-        width: 80,
+        width: 90,
         accentColor: C.acc
       }
     }), React.createElement("span", {
       style: {
         fontSize: 13,
         color: C.acc,
-        fontWeight: 600,
-        minWidth: 30
+        fontWeight: 700,
+        minWidth: 34
       }
     }, zoom, "\xD7"), React.createElement("span", {
       style: {
-        fontSize: 12,
+        fontSize: 13,
         color: C.muted,
         marginLeft: 8,
-        fontFamily: "monospace"
+        fontFamily: "monospace",
+        fontWeight: 600
       }
     }, fmt(currentTime))), React.createElement("div", {
       ref: tlRef,
       style: {
         flex: 1,
         overflowX: "auto",
-        overflowY: "hidden",
+        overflowY: "auto",
         position: "relative",
         cursor: trimDrag ? "ew-resize" : "crosshair",
         userSelect: "none"
@@ -4938,16 +4951,18 @@ function CutStudio() {
       style: {
         width: totalW,
         position: "relative",
-        height: "100%"
+        minHeight: tlTotalH
       }
     }, React.createElement("div", {
       style: {
-        height: 20,
+        height: RULER_H,
         background: C.surf2,
         borderBottom: `1px solid ${C.border}`,
         position: "sticky",
         top: 0,
-        zIndex: 10
+        zIndex: 10,
+        display: "flex",
+        alignItems: "flex-end"
       }
     }, Array.from({
       length: Math.ceil(totalDur / tickStep) + 2
@@ -4957,28 +4972,29 @@ function CutStudio() {
         key: t,
         style: {
           position: "absolute",
-          left: 48 + t * pxPerSec,
+          left: 56 + t * pxPerSec,
           bottom: 0
         }
       }, React.createElement("div", {
         style: {
           width: 1,
-          height: t % 10 === 0 ? 12 : 6,
-          background: t % 10 === 0 ? "#bbb" : C.border
+          height: t % 10 === 0 ? 14 : 7,
+          background: t % 10 === 0 ? "#999" : C.border
         }
       }), t % Math.max(tickStep * 2, tickStep) === 0 && React.createElement("span", {
         style: {
           position: "absolute",
-          top: -14,
+          top: -16,
           left: 2,
-          fontSize: 10,
+          fontSize: 11,
           color: C.muted,
           whiteSpace: "nowrap",
-          fontFamily: "monospace"
+          fontFamily: "monospace",
+          fontWeight: 500
         }
       }, fmt(t)));
     })), visibleTracks.map((track, ti) => {
-      const top = 22 + ti * 26;
+      const top = RULER_H + ti * TRACK_H;
       return React.createElement("div", {
         key: track.key
       }, React.createElement("div", {
@@ -4986,17 +5002,19 @@ function CutStudio() {
           position: "absolute",
           left: 0,
           top,
-          width: 44,
-          height: 22,
+          width: 52,
+          height: TRACK_H,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 9,
-          color: track.color,
+          fontSize: 11,
+          color: "#fff",
           fontWeight: 800,
-          background: C.surf2,
+          background: track.color,
           zIndex: 5,
-          borderRight: `1px solid ${C.border}`
+          letterSpacing: .5,
+          borderRight: `2px solid ${C.border}`,
+          borderBottom: `1px solid rgba(255,255,255,.2)`
         }
       }, track.label), track.key === "VID" && (() => {
         let pos = 0;
@@ -5016,27 +5034,28 @@ function CutStudio() {
             },
             style: {
               position: "absolute",
-              left: 48 + x,
-              top: top + 2,
-              width: Math.max(w - 2, 14),
-              height: 20,
-              borderRadius: 5,
+              left: 56 + x,
+              top: top + 3,
+              width: Math.max(w - 3, 16),
+              height: CLIP_H,
+              borderRadius: 8,
               background: c.color,
               cursor: "pointer",
               overflow: "visible",
-              border: isSel ? `2px solid ${C.acc}` : "2px solid rgba(255,255,255,.5)"
+              border: isSel ? `2px solid ${C.acc}` : "2px solid rgba(255,255,255,.5)",
+              boxShadow: isSel ? "0 0 0 2px rgba(37,99,235,.3),0 2px 8px rgba(0,0,0,.2)" : "0 2px 6px rgba(0,0,0,.15)"
             }
           }, React.createElement("div", {
             style: {
               position: "absolute",
               inset: 0,
-              borderRadius: 4,
+              borderRadius: 6,
               overflow: "hidden"
             }
           }, React.createElement("div", {
             style: {
-              padding: "2px 20px 2px 5px",
-              fontSize: 9,
+              padding: "4px 24px 4px 10px",
+              fontSize: 12,
               fontWeight: 700,
               color: "rgba(255,255,255,.95)",
               whiteSpace: "nowrap",
@@ -5047,22 +5066,30 @@ function CutStudio() {
           }, c.name), c.effect !== "none" && React.createElement("div", {
             style: {
               position: "absolute",
-              bottom: 2,
-              right: 3,
-              fontSize: 8,
-              color: "rgba(255,255,255,.85)",
+              bottom: 4,
+              right: 6,
+              fontSize: 10,
+              color: "rgba(255,255,255,.9)",
               background: "rgba(0,0,0,.4)",
-              borderRadius: 2,
-              padding: "0px 3px"
+              borderRadius: 4,
+              padding: "1px 6px"
             }
-          }, EFFECTS_LIST.find(e => e.id === c.effect)?.name)), React.createElement("div", {
+          }, EFFECTS_LIST.find(e => e.id === c.effect)?.name), ((c.trimStart ?? 0) > 0 || (c.trimEnd ?? c.duration) < c.duration) && React.createElement("div", {
+            style: {
+              position: "absolute",
+              top: 4,
+              right: 6,
+              fontSize: 11,
+              color: "rgba(255,255,255,.9)"
+            }
+          }, "\u2702")), React.createElement("div", {
             onMouseDown: ev => startTrimDrag(ev, c.id, "left"),
             style: {
               position: "absolute",
-              left: -3,
+              left: -5,
               top: 0,
               bottom: 0,
-              width: 8,
+              width: 12,
               cursor: "ew-resize",
               zIndex: 10,
               display: "flex",
@@ -5071,19 +5098,20 @@ function CutStudio() {
             }
           }, React.createElement("div", {
             style: {
-              width: 3,
-              height: 14,
-              borderRadius: 2,
-              background: "rgba(255,255,255,.8)"
+              width: 4,
+              height: CLIP_H * 0.6,
+              borderRadius: 3,
+              background: isSel ? "rgba(255,255,255,.95)" : "rgba(255,255,255,.6)",
+              boxShadow: "0 1px 4px rgba(0,0,0,.3)"
             }
           })), React.createElement("div", {
             onMouseDown: ev => startTrimDrag(ev, c.id, "right"),
             style: {
               position: "absolute",
-              right: -3,
+              right: -5,
               top: 0,
               bottom: 0,
-              width: 8,
+              width: 12,
               cursor: "ew-resize",
               zIndex: 10,
               display: "flex",
@@ -5092,10 +5120,11 @@ function CutStudio() {
             }
           }, React.createElement("div", {
             style: {
-              width: 3,
-              height: 14,
-              borderRadius: 2,
-              background: "rgba(255,255,255,.8)"
+              width: 4,
+              height: CLIP_H * 0.6,
+              borderRadius: 3,
+              background: isSel ? "rgba(255,255,255,.95)" : "rgba(255,255,255,.6)",
+              boxShadow: "0 1px 4px rgba(0,0,0,.3)"
             }
           })));
         });
@@ -5105,7 +5134,7 @@ function CutStudio() {
         const isSel = selLayerId === l.id && selLayerType === track.key.toLowerCase();
         let bg, brd, labelTxt;
         if (track.key === "PIC") {
-          bg = "#e0f2fe";
+          bg = isSel ? "#bae6fd" : "#e0f2fe";
           brd = isSel ? "#0891b2" : "#7dd3fc";
           labelTxt = "🖼 " + (l.imageName || "pic");
         } else if (track.key === "TXT") {
@@ -5113,11 +5142,11 @@ function CutStudio() {
           brd = isSel ? "#7c3aed" : C.acc;
           labelTxt = (l.animIn !== "none" ? "▶ " : "") + l.text + (l.animOut !== "none" ? " ◀" : "");
         } else if (track.key === "EMJ") {
-          bg = "#fef3c7";
+          bg = isSel ? "#fef08a" : "#fef3c7";
           brd = isSel ? "#d97706" : "#fbbf24";
           labelTxt = l.imageUrl ? "📎" : l.emoji || "?";
         } else if (track.key === "MUS") {
-          bg = isSel ? "#dcfce7" : "#d1fae5";
+          bg = isSel ? "#bbf7d0" : "#d1fae5";
           brd = isSel ? "#16a34a" : "#34d399";
           labelTxt = "🎵 " + (l.audioName || "music");
         }
@@ -5128,36 +5157,48 @@ function CutStudio() {
             setSelLayerId(l.id);
             setSelLayerType(track.key.toLowerCase());
             setSelClipId(null);
+            setExpandedLayerId(l.id);
           },
           style: {
             position: "absolute",
-            left: 48 + x,
-            top: top + 2,
-            width: Math.max(w - 2, 12),
-            height: 20,
-            borderRadius: 5,
+            left: 56 + x,
+            top: top + 3,
+            width: Math.max(w - 3, 14),
+            height: CLIP_H,
+            borderRadius: 7,
             background: bg,
-            border: `1.5px solid ${brd}`,
+            border: `2px solid ${brd}`,
             cursor: "pointer",
-            fontSize: 9,
+            fontSize: 11,
             fontWeight: 600,
-            padding: "0 5px",
+            padding: "0 8px",
             overflow: "hidden",
             whiteSpace: "nowrap",
             textOverflow: "ellipsis",
             display: "flex",
             alignItems: "center",
-            color: isSel ? "#1a1a2a" : "#374151"
+            color: isSel ? "#1a1a2a" : "#374151",
+            boxShadow: isSel ? "0 0 0 2px rgba(0,0,0,.15)" : C.shadow
           }
         }, labelTxt);
+      }), React.createElement("div", {
+        style: {
+          position: "absolute",
+          left: 0,
+          top: top + TRACK_H - 1,
+          right: 0,
+          height: 1,
+          background: C.border,
+          zIndex: 4
+        }
       }));
     }), React.createElement("div", {
       style: {
         position: "absolute",
         top: 0,
-        left: 48 + currentTime * pxPerSec,
+        left: 56 + currentTime * pxPerSec,
         bottom: 0,
-        width: 2,
+        width: 3,
         background: "#ef4444",
         zIndex: 20,
         pointerEvents: "none"
@@ -5166,11 +5207,12 @@ function CutStudio() {
       style: {
         position: "absolute",
         top: -1,
-        left: -5,
-        width: 12,
-        height: 11,
+        left: -6,
+        width: 15,
+        height: 14,
         background: "#ef4444",
-        clipPath: "polygon(50% 100%,0 0,100% 0)"
+        clipPath: "polygon(50% 100%,0 0,100% 0)",
+        borderRadius: 1
       }
     })))));
   })(), showSave && React.createElement("div", {
